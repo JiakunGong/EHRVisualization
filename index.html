@@ -1,405 +1,605 @@
 <!DOCTYPE html>
 <html>
-	<head>
-		<meta http-equiv="Content-Type" content="text/html;charset=utf-8"/ >
-		<title>Smoothed D3.js Radar Chart</title>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+	<title>Symptom and Age Group Relationships</title>
 
-		<!-- Google fonts -->
-		<link href='http://fonts.googleapis.com/css?family=Open+Sans:400,300' rel='stylesheet' type='text/css'>
-		<link href='https://fonts.googleapis.com/css?family=Raleway' rel='stylesheet' type='text/css'>
+	<!-- D3.js -->	
+    <script src="http://d3js.org/d3.v3.js"></script>
+	<script >
+	
+stretchedChord = function() {
+    var source = d3_source, 
+    target = d3_target, 
+    radius = d3_svg_chordRadius, 
+    startAngle = d3_svg_arcStartAngle, 
+    endAngle = d3_svg_arcEndAngle,
+    pullOutSize = 0;
+    
+  var π = Math.PI,
+    halfπ = π / 2;
 
-		<!-- D3.js -->
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.6/d3.min.js" charset="utf-8"></script>
-		
-		<style>
-			body {
-				font-family: 'Open Sans', sans-serif;
-				font-size: 11px;
-				font-weight: 300;
-				fill: #242424;
-				text-align: center;
-				text-shadow: 0 1px 0 #fff, 1px 0 0 #fff, -1px 0 0 #fff, 0 -1px 0 #fff;
-				cursor: default;
-			}
-			
-			.legend {
-				font-family: 'Raleway', sans-serif;
-				fill: #333333;
-			}
-			
-			.tooltip {
-				fill: #333333;
-			}
-		</style>
-	
-	</head>
-	<body>
-		
-		<h1>Radar graph showing how age groups' patient symptoms distributed</h1>
-		<div>
-			<svg id="my_dataviz" height=100 width=4500></svg>
-		</div> 
-		<div class="radarChart">
-			
-		</div>
-		
-		<script >
-		
-		function RadarChart(id, data, options) {
-	var cfg = {
-	 w: 600,				//Width of the circle
-	 h: 600,				//Height of the circle
-	 margin: {top: 0, right: 20, bottom: 20, left: 20}, //The margins of the SVG
-	 levels: 8,				//How many levels or inner circles should there be drawn
-	 maxValue: 30, 			//What is the value that the biggest circle will represent
-	 labelFactor: 1.25, 	//How much farther than the radius of the outer circle should the labels be placed
-	 wrapWidth: 60, 		//The number of pixels after which a label needs to be given a new line
-	 opacityArea: 0.35, 	//The opacity of the area of the blob
-	 dotRadius: 4, 			//The size of the colored circles of each blog
-	 opacityCircles: 0.1, 	//The opacity of the circles of each blob
-	 strokeWidth: 2, 		//The width of the stroke around each blob
-	 roundStrokes: false,	//If true the area and stroke will follow a round path (cardinal-closed)
-	 color: d3.scale.category10()	//Color function
-	};
-	
-	//Put all of the options into a variable called cfg
-	if('undefined' !== typeof options){
-	  for(var i in options){
-		if('undefined' !== typeof options[i]){ cfg[i] = options[i]; }
-	  }//for i
-	}//if
-	
-	//If the supplied maxValue is smaller than the actual one, replace by the max in the data
-	var maxValue = Math.max(cfg.maxValue, d3.max(data, function(i){return d3.max(i.map(function(o){return o.value;}))}));
-		
-	var allAxis = (data[0].map(function(i, j){return i.axis})),	//Names of each axis
-		total = allAxis.length,					//The number of different axes
-		radius = Math.min(cfg.w/2, cfg.h/2), 	//Radius of the outermost circle
-		Format = d3.format(''),			 	//Percentage formatting
-		angleSlice = Math.PI * 2 / total;		//The width in radians of each "slice"
-	
-	//Scale for the radius
-	var rScale = d3.scale.linear()
-		.range([0, radius])
-		.domain([0, maxValue]);
-		
-	
+    function subgroup(self, f, d, i) {
+    var subgroup = f.call(self, d, i), 
+      r = radius.call(self, subgroup, i), 
+      a0 = startAngle.call(self, subgroup, i) - halfπ, 
+      a1 = endAngle.call(self, subgroup, i) - halfπ;
+      return {
+        r: r,
+        a0: [a0],
+        a1: [a1],
+        p0: [ r * Math.cos(a0), r * Math.sin(a0)],
+        p1: [ r * Math.cos(a1), r * Math.sin(a1)]
+      };
+    }
 
-	//Remove whatever chart with the same id/class was present before
-	d3.select(id).select("svg").remove();
-	
-	//Initiate the radar chart SVG
-	var svg = d3.select(id).append("svg")
-			.attr("width",  cfg.w + cfg.margin.left + cfg.margin.right)
-			.attr("height", cfg.h + cfg.margin.top + cfg.margin.bottom)
-			.attr("class", "radar"+id);
-	//Append a g element		
-	var g = svg.append("g")
-			.attr("transform", "translate(" + (cfg.w/2 + cfg.margin.left) + "," + (cfg.h/2 + cfg.margin.top) + ")");
-	
-	
-	//Filter for the outside glow
-	var filter = g.append('defs').append('filter').attr('id','glow'),
-		feGaussianBlur = filter.append('feGaussianBlur').attr('stdDeviation','2.5').attr('result','coloredBlur'),
-		feMerge = filter.append('feMerge'),
-		feMergeNode_1 = feMerge.append('feMergeNode').attr('in','coloredBlur'),
-		feMergeNode_2 = feMerge.append('feMergeNode').attr('in','SourceGraphic');
+    function arc(r, p, a) {
+    var sign = (p[0] >= 0 ? 1 : -1);
+    return "A" + r + "," + r + " 0 " + +(a > π) + ",1 " + (p[0] + sign*pullOutSize) + "," + p[1];
+    }
 
-	/////////////////////////////////////////////////////////
-	/////////////// Draw the Circular grid //////////////////
-	/////////////////////////////////////////////////////////
-	
-	//Wrapper for the grid & axes
-	var axisGrid = g.append("g").attr("class", "axisWrapper");
-	
-	//Draw the background circles
-	axisGrid.selectAll(".levels")
-	   .data(d3.range(1,(cfg.levels+1)).reverse())
-	   .enter()
-		.append("circle")
-		.attr("class", "gridCircle")
-		.attr("r", function(d, i){return radius/cfg.levels*d;})
-		.style("fill", "#CDCDCD")
-		.style("stroke", "#CDCDCD")
-		.style("fill-opacity", cfg.opacityCircles)
-		.style("filter" , "url(#glow)");
 
-	//Text indicating at what % each level is
-	axisGrid.selectAll(".axisLabel")
-	   .data(d3.range(1,(cfg.levels+1)).reverse())
-	   .enter().append("text")
-	   .attr("class", "axisLabel")
-	   .attr("x", 4)
-	   .attr("y", function(d){return -d*radius/cfg.levels;})
-	   .attr("dy", "0.4em")
-	   .style("font-size", "10px")
-	   .attr("fill", "#737373")
-	   .text(function(d,i) { return Format(maxValue * d/cfg.levels); });
+    function curve(p1) {
+    var sign = (p1[0] >= 0 ? 1 : -1);
+    return "Q 0,0 " + (p1[0] + sign*pullOutSize) + "," + p1[1];
+    }
+  
+  /*
+  M = moveto
+  M x,y
+  Q = quadratic Bézier curve
+  Q control-point-x,control-point-y end-point-x, end-point-y
+  A = elliptical Arc
+  A rx, ry x-axis-rotation large-arc-flag, sweep-flag  end-point-x, end-point-y
+  Z = closepath
 
-	
-	
-	//Create the straight lines radiating outward from the center
-	var axis = axisGrid.selectAll(".axis")
-		.data(allAxis)
-		.enter()
-		.append("g")
-		.attr("class", "axis");
-	//Append the lines
-	axis.append("line")
-		.attr("x1", 0)
-		.attr("y1", 0)
-		.attr("x2", function(d, i){ return rScale(maxValue*1.1) * Math.cos(angleSlice*i - Math.PI/2); })
-		.attr("y2", function(d, i){ return rScale(maxValue*1.1) * Math.sin(angleSlice*i - Math.PI/2); })
-		.attr("class", "line")
-		.style("stroke", "white")
-		.style("stroke-width", "2px");
+  M251.5579641956022,87.98204731514328
+  A266.5,266.5 0 0,1 244.49937503334525,106.02973926358392
+  Q 0,0 -177.8355222451483,198.48621369706098
+  A266.5,266.5 0 0,1 -191.78901944612068,185.0384338992728
+  Q 0,0 251.5579641956022,87.98204731514328
+  Z
+  */  
+    function chord(d, i) {
+    var s = subgroup(this, source, d, i), 
+      t = subgroup(this, target, d, i);
+          
+  return "M" + (s.p0[0] + pullOutSize) + "," + s.p0[1] + 
+      arc(s.r, s.p1, s.a1 - s.a0) + 
+      curve(t.p0) + 
+      arc(t.r, t.p1, t.a1 - t.a0) + 
+      curve(s.p0) + 
+      "Z";
+   }//chord
 
-	//Append the labels at each axis
-	axis.append("text")
-		.attr("class", "legend")
-		.style("font-size", "11px")
-		.attr("text-anchor", "middle")
-		.attr("dy", "0.35em")
-		.attr("x", function(d, i){ return rScale(maxValue * cfg.labelFactor) * Math.cos(angleSlice*i - Math.PI/2); })
-		.attr("y", function(d, i){ return rScale(maxValue * cfg.labelFactor) * Math.sin(angleSlice*i - Math.PI/2); })
-		.text(function(d){return d})
-		.call(wrap, cfg.wrapWidth);
+    chord.radius = function(v) {
+      if (!arguments.length) return radius;
+      radius = d3_functor(v);
+      return chord;
+    };
+    chord.pullOutSize = function(v) {
+      if (!arguments.length) return pullOutSize;
+      pullOutSize = v;
+      return chord;
+    };
+    chord.source = function(v) {
+      if (!arguments.length) return source;
+      source = d3_functor(v);
+      return chord;
+    };
+    chord.target = function(v) {
+      if (!arguments.length) return target;
+      target = d3_functor(v);
+      return chord;
+    };
+    chord.startAngle = function(v) {
+      if (!arguments.length) return startAngle;
+      startAngle = d3_functor(v);
+      return chord;
+    };
+    chord.endAngle = function(v) {
+      if (!arguments.length) return endAngle;
+      endAngle = d3_functor(v);
+      return chord;
+    };
 
+
+  function d3_svg_chordRadius(d) {
+      return d.radius;
+  }
+
+  function d3_source(d) {
+    return d.source;
+  }
+    
+  function d3_target(d) {
+      return d.target;
+  }
+
+  function d3_svg_arcStartAngle(d) {
+      return d.startAngle;
+  }
+    
+  function d3_svg_arcEndAngle(d) {
+      return d.endAngle;
+  }
+
+  function d3_functor(v) {
+    return typeof v === "function" ? v : function() {
+      return v;
+    };
+  }
+
+  return chord;
+
+}//stretchedChord
 	
 	
-	//The radial line function
-	var radarLine = d3.svg.line.radial()
-		.interpolate("linear-closed")
-		.radius(function(d) { return rScale(d.value); })
-		.angle(function(d,i) {	return i*angleSlice; });
+	
+	</script>
+	<script >
+	
+	
+customChordLayout = function() {
+	var ε = 1e-6, ε2 = ε * ε, π = Math.PI, τ = 2 * π, τε = τ - ε, halfπ = π / 2, d3_radians = π / 180, d3_degrees = 180 / π;
+    var chord = {}, chords, groups, matrix, n, padding = 0, sortGroups, sortSubgroups, sortChords;
+    function relayout() {
+      var subgroups = {}, groupSums = [], groupIndex = d3.range(n), subgroupIndex = [], k, x, x0, i, j;
+      chords = [];
+      groups = [];
+      k = 0, i = -1;
+      while (++i < n) {
+        x = 0, j = -1;
+        while (++j < n) {
+          x += matrix[i][j];
+        }
+        groupSums.push(x);
+        subgroupIndex.push(d3.range(n).reverse());
+        k += x;
+      }
+      if (sortGroups) {
+        groupIndex.sort(function(a, b) {
+          return sortGroups(groupSums[a], groupSums[b]);
+        });
+      }
+      if (sortSubgroups) {
+        subgroupIndex.forEach(function(d, i) {
+          d.sort(function(a, b) {
+            return sortSubgroups(matrix[i][a], matrix[i][b]);
+          });
+        });
+      }
+      k = (τ - padding * n) / k;
+      x = 0, i = -1;
+      while (++i < n) {
+        x0 = x, j = -1;
+        while (++j < n) {
+          var di = groupIndex[i], dj = subgroupIndex[di][j], v = matrix[di][dj], a0 = x, a1 = x += v * k;
+          subgroups[di + "-" + dj] = {
+            index: di,
+            subindex: dj,
+            startAngle: a0,
+            endAngle: a1,
+            value: v
+          };
+        }
+        groups[di] = {
+          index: di,
+          startAngle: x0,
+          endAngle: x,
+          value: (x - x0) / k
+        };
+        x += padding;
+      }
+      i = -1;
+      while (++i < n) {
+        j = i - 1;
+        while (++j < n) {
+          var source = subgroups[i + "-" + j], target = subgroups[j + "-" + i];
+          if (source.value || target.value) {
+            chords.push(source.value < target.value ? {
+              source: target,
+              target: source
+            } : {
+              source: source,
+              target: target
+            });
+          }
+        }
+      }
+      if (sortChords) resort();
+    }
+    function resort() {
+      chords.sort(function(a, b) {
+        return sortChords((a.source.value + a.target.value) / 2, (b.source.value + b.target.value) / 2);
+      });
+    }
+    chord.matrix = function(x) {
+      if (!arguments.length) return matrix;
+      n = (matrix = x) && matrix.length;
+      chords = groups = null;
+      return chord;
+    };
+    chord.padding = function(x) {
+      if (!arguments.length) return padding;
+      padding = x;
+      chords = groups = null;
+      return chord;
+    };
+    chord.sortGroups = function(x) {
+      if (!arguments.length) return sortGroups;
+      sortGroups = x;
+      chords = groups = null;
+      return chord;
+    };
+    chord.sortSubgroups = function(x) {
+      if (!arguments.length) return sortSubgroups;
+      sortSubgroups = x;
+      chords = null;
+      return chord;
+    };
+    chord.sortChords = function(x) {
+      if (!arguments.length) return sortChords;
+      sortChords = x;
+      if (chords) resort();
+      return chord;
+    };
+    chord.chords = function() {
+      if (!chords) relayout();
+      return chords;
+    };
+    chord.groups = function() {
+      if (!groups) relayout();
+      return groups;
+    };
+    return chord;
+  };
+	
+	
+	
+	
+	</script>
+	
+	<!-- jQuery -->
+	<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+	
+	<!-- Open Sans & CSS -->
+	<link href='http://fonts.googleapis.com/css?family=Open+Sans:700,400,300' rel='stylesheet' type='text/css'>
+	  <style>
+		body {
+		  font-family: 'Open Sans', sans-serif;
+		  font-size: 12px;
+		  font-weight: 400;
+		  color: #525252;
+		  text-align: center;
+		}	
 		
-	if(cfg.roundStrokes) {
-		radarLine.interpolate("cardinal-closed");
-	}
-				
-	//Create a wrapper for the blobs	
-	var blobWrapper = g.selectAll(".radarWrapper")
-		.data(data)
-		.enter().append("g")
-		.attr("class", "radarWrapper");
-			
-	//Append the backgrounds	
-	blobWrapper
-		.append("path")
-		.attr("class", "radarArea")
-		.attr("d", function(d,i) { return radarLine(d); })
-		.style("fill", function(d,i) { return cfg.color(i); })
-		.style("fill-opacity", cfg.opacityArea)
-		.on('mouseover', function (d,i){
-			//Dim all blobs
-			d3.selectAll(".radarArea")
-				.transition().duration(200)
-				.style("fill-opacity", 0.1); 
-			//Bring back the hovered over blob
-			d3.select(this)
-				.transition().duration(200)
-				.style("fill-opacity", 0.7);	
-		})
-		.on('mouseout', function(){
-			//Bring back all blobs
-			d3.selectAll(".radarArea")
-				.transition().duration(200)
-				.style("fill-opacity", cfg.opacityArea);
-		});
-		
-	//Create the outlines	
-	blobWrapper.append("path")
-		.attr("class", "radarStroke")
-		.attr("d", function(d,i) { return radarLine(d); })
-		.style("stroke-width", cfg.strokeWidth + "px")
-		.style("stroke", function(d,i) { return cfg.color(i); })
-		.style("fill", "none")
-		.style("filter" , "url(#glow)");		
-	
-	//Append the circles
-	blobWrapper.selectAll(".radarCircle")
-		.data(function(d,i) { return d; })
-		.enter().append("circle")
-		.attr("class", "radarCircle")
-		.attr("r", cfg.dotRadius)
-		.attr("cx", function(d,i){ return rScale(d.value) * Math.cos(angleSlice*i - Math.PI/2); })
-		.attr("cy", function(d,i){ return rScale(d.value) * Math.sin(angleSlice*i - Math.PI/2); })
-		.style("fill", function(d,i,j) { return cfg.color(j); })
-		.style("fill-opacity", 0.8);
+		line {
+		  stroke: #000;
+		  stroke-width: 1.px;
+		}
 
-	
-	//Wrapper for the invisible circles on top
-	var blobCircleWrapper = g.selectAll(".radarCircleWrapper")
-		.data(data)
-		.enter().append("g")
-		.attr("class", "radarCircleWrapper");
-		
-	//Append a set of invisible circles on top for the mouseover pop-up
-	blobCircleWrapper.selectAll(".radarInvisibleCircle")
-		.data(function(d,i) { return d; })
-		.enter().append("circle")
-		.attr("class", "radarInvisibleCircle")
-		.attr("r", cfg.dotRadius*1.5)
-		.attr("cx", function(d,i){ return rScale(d.value) * Math.cos(angleSlice*i - Math.PI/2); })
-		.attr("cy", function(d,i){ return rScale(d.value) * Math.sin(angleSlice*i - Math.PI/2); })
-		.style("fill", "none")
-		.style("pointer-events", "all")
-		.on("mouseover", function(d,i) {
-			newX =  parseFloat(d3.select(this).attr('cx')) - 10;
-			newY =  parseFloat(d3.select(this).attr('cy')) - 10;
-					
-			tooltip
-				.attr('x', newX)
-				.attr('y', newY)
-				.text(Format(d.value))
-				.transition().duration(200)
-				.style('opacity', 1);
-		})
-		.on("mouseout", function(){
-			tooltip.transition().duration(200)
-				.style("opacity", 0);
-		});
-		
-	//Set up the small tooltip for when you hover over a circle
-	var tooltip = g.append("text")
-		.attr("class", "tooltip")
-		.style("opacity", 0);
-	
-	
+		text {
+		  font-size: 8px;
+		}
 
-	//Taken from http://bl.ocks.org/mbostock/7555321
-	//Wraps SVG text	
-	function wrap(text, width) {
-	  text.each(function() {
-		var text = d3.select(this),
-			words = text.text().split(/\s+/).reverse(),
-			word,
-			line = [],
-			lineNumber = 0,
-			lineHeight = 1.4, // ems
-			y = text.attr("y"),
-			x = text.attr("x"),
-			dy = parseFloat(text.attr("dy")),
-			tspan = text.text(null).append("tspan").attr("x", x).attr("y", y).attr("dy", dy + "em");
-			
-		while (word = words.pop()) {
-		  line.push(word);
-		  tspan.text(line.join(" "));
-		  if (tspan.node().getComputedTextLength() > width) {
-			line.pop();
-			tspan.text(line.join(" "));
-			line = [word];
-			tspan = text.append("tspan").attr("x", x).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
+		path.chord {
+		  fill-opacity: .80;
+		}
+		
+		.title {
+			text-anchor: middle;
+			fill: #3B3B3B;
+			font-weight: 300;
+			font-size: 16px;
+		}
+		.titleLine {
+			stroke: #DCDCDC;
+			shape-rendering: crispEdges;
+		}
+		
+		.title-h3 {
+		    margin-top: 20px;
+		    margin-bottom: 10px;
+		    font-size: 24px;
+		    font-weight: 500;
+			line-height: 1.1;
+			color: #3B3B3B;
+		}
+		
+		@media (min-width: 500px) {
+		  .explanation {
+			width: 50%; 
+			margin: 0 auto;
 		  }
 		}
-	  });
-	}//wrap	
-	
-}//RadarChart
-		
-		
-		</script>	
-		<script>
-      
-      /* Radar chart design created by Nadieh Bremer - VisualCinnamon.com */
-      
-			////////////////////////////////////////////////////////////// 
-			//////////////////////// Set-Up ////////////////////////////// 
-			////////////////////////////////////////////////////////////// 
-
-			var margin = {top: 20, right: 100, bottom: 100, left: 100},
-				width = Math.min(700, window.innerWidth - 10) - margin.left - margin.right,
-				height = Math.min(width, window.innerHeight - margin.top - margin.bottom - 20);
-					
-			////////////////////////////////////////////////////////////// 
-			////////////////////////// Data ////////////////////////////// 
-			////////////////////////////////////////////////////////////// 
-
-			var data = [
-   
-   [
-     {axis: "Cognitive ", value: 2},
-     {axis: "Vision", value: 14},
-     {axis: "NON_skull_inj ", value: 7},
-     {axis: "Headache", value: 26},
-     {axis: "Depression", value: 30},
-     {axis: "Anxiety", value: 0},
-     {axis: "Sleep", value: 14},
-     {axis: "Neurologic", value: 0}
-
-     ],
-   [
-       {axis: "Cognitive ", value: 6},
-       {axis: "Vision", value: 2},
-       {axis: "NON_skull_inj ", value: 12},
-       {axis: "Headache", value: 4},
-       {axis: "Depression", value: 18},
-       {axis: "Anxiety", value: 0},
-       {axis: "Sleep", value: 3},
-       {axis: "Neurologic", value: 3}
+	  </style>
+  </head>
+  <body>
  
-   ],
-   [
-           {axis: "Cognitive ", value: 3},
-           {axis: "Vision", value: 1},
-           {axis: "NON_skull_inj ", value: 5},
-           {axis: "Headache", value: 0},
-           {axis: "Depression", value: 6},
-           {axis: "Anxiety", value: 28},
-           {axis: "Sleep", value: 11},
-           {axis: "Neurologic", value: 5}
-     
-   ],
-   [
-       {axis: "Cognitive ", value: 3},
-       {axis: "Vision", value: 0},
-       {axis: "NON_skull_inj ", value: 3},
-       {axis: "Headache", value: 1},
-       {axis: "Depression", value: 21},
-       {axis: "Anxiety", value: 0},
-       {axis: "Sleep", value: 1},
-       {axis: "Neurologic", value: 4}
-         
-   ]
+	<div class="title-h3">How does different age groups contribute to different symptoms</div>
 
-
- ]
-
-
-			var color = d3.scale.ordinal()
-				.range(["#6F257F", "#CA0D59","#34eb7aS","#eba834"]);
-				
-			var radarChartOptions = {
-			  w: width,
-			  h: height,
-			  margin: margin,
-			  maxValue: 0.5,
-			  levels: 5,
-			  roundStrokes: true,
-			  color: color
-			};
-			//Call function to draw the Radar chart
-			RadarChart(".radarChart", data, radarChartOptions);
-		</script>
+    <div id="chart"></div>
 	
-	<div>
-		<svg id="my_dataviz" height=3000 width=4500></svg>
-	</div> 
-	<script>
+	<div style="width: 100%;">
+		<div class="explanation">
+		The graph shows a flow from counts of medical record from different age groups contribute to our information
+		about symptoms. The thickness of the curve represents the size of the count, the thicker it is, the more counts there are.
+		</div>
+	</div>
+	
+	<script >
+	
+	
+var screenWidth = $(window).innerWidth(), 
+	mobileScreen = (screenWidth > 500 ? false : true);
 
-		// select the svg area
-		var svg = d3.select("#my_dataviz")
-		
-		// Handmade legend
-		svg.append("circle").attr("cx",700).attr("cy",10).attr("r", 6).style("fill", "#6F257F")
-		svg.append("circle").attr("cx",700).attr("cy",30).attr("r", 6).style("fill", "#CA0D59")
-		svg.append("text").attr("x", 720).attr("y", 10).text("5-14").style("font-size", "15px").attr("alignment-baseline","middle")
-		svg.append("text").attr("x", 720).attr("y", 30).text("45-64").style("font-size", "15px").attr("alignment-baseline","middle")
-		svg.append("circle").attr("cx",700).attr("cy",50).attr("r", 6).style("fill", "#34eb7aS")
-		svg.append("circle").attr("cx",700).attr("cy",70).attr("r", 6).style("fill", "#eba834")
-		svg.append("text").attr("x", 720).attr("y", 50).text("35-44").style("font-size", "15px").attr("alignment-baseline","middle")
-		svg.append("text").attr("x", 720).attr("y", 70).text("18-24").style("font-size", "15px").attr("alignment-baseline","middle")
-		
+var margin = {left: 50, top: 10, right: 50, bottom: 10},
+	width = Math.min(screenWidth, 800) - margin.left - margin.right,
+	height = (mobileScreen ? 300 : Math.min(screenWidth, 800)*5/6) - margin.top - margin.bottom;
+			
+var svg = d3.select("#chart").append("svg")
+			.attr("width", (width + margin.left + margin.right))
+			.attr("height", (height + margin.top + margin.bottom));
+			
+var wrapper = svg.append("g").attr("class", "chordWrapper")
+			.attr("transform", "translate(" + (width / 2 + margin.left) + "," + (height / 2 + margin.top) + ")");;
+			
+var outerRadius = Math.min(width, height) / 2  - (mobileScreen ? 80 : 100),
+	innerRadius = outerRadius * 0.95,
+	opacityDefault = 0.7, //default opacity of chords
+	opacityLow = 0.02; //hover opacity of those chords not hovered over
+	
+//How many pixels should the two halves be pulled apart
+var pullOutSize = (mobileScreen? 20 : 50)
+
+
+
+var titleWrapper = svg.append("g").attr("class", "chordTitleWrapper"),
+	titleOffset = mobileScreen ? 15 : 40,
+	titleSeparate = mobileScreen ? 30 : 0;
+
+//Title	top left
+titleWrapper.append("text")
+	.attr("class","title left")
+	.style("font-size", mobileScreen ? "12px" : "16px" )
+	.attr("x", (width/2 + margin.left - outerRadius - titleSeparate))
+	.attr("y", titleOffset)
+	.text("Age Group");
+titleWrapper.append("line")
+	.attr("class","titleLine left")
+	.attr("x1", (width/2 + margin.left - outerRadius - titleSeparate)*0.6)
+	.attr("x2", (width/2 + margin.left - outerRadius - titleSeparate)*1.4)
+	.attr("y1", titleOffset+8)
+	.attr("y2", titleOffset+8);
+//Title top right
+titleWrapper.append("text")
+	.attr("class","title right")
+	.style("font-size", mobileScreen ? "12px" : "16px" )
+	.attr("x", (width/2 + margin.left + outerRadius + titleSeparate))
+	.attr("y", titleOffset)
+	.text("Symptoms");
+titleWrapper.append("line")
+	.attr("class","titleLine right")
+	.attr("x1", (width/2 + margin.left - outerRadius - titleSeparate)*0.6 + 2*(outerRadius + titleSeparate))
+	.attr("x2", (width/2 + margin.left - outerRadius - titleSeparate)*1.4 + 2*(outerRadius + titleSeparate))
+	.attr("y1", titleOffset+8)
+	.attr("y2", titleOffset+8);
+	
+////////////////////////////////////////////////////////////
+/////////////////// Animated gradient //////////////////////
+////////////////////////////////////////////////////////////
+
+var defs = wrapper.append("defs");
+var linearGradient = defs.append("linearGradient")
+	.attr("id","animatedGradient")
+	.attr("x1","0%")
+	.attr("y1","0%")
+	.attr("x2","100%")
+	.attr("y2","0")
+	.attr("spreadMethod", "reflect");
+
+linearGradient.append("animate")
+	.attr("attributeName","x1")
+	.attr("values","0%;100%")
+//	.attr("from","0%")
+//	.attr("to","100%")
+	.attr("dur","7s")
+	.attr("repeatCount","indefinite");
+
+linearGradient.append("animate")
+	.attr("attributeName","x2")
+	.attr("values","100%;200%")
+//	.attr("from","100%")
+//	.attr("to","200%")
+	.attr("dur","7s")
+	.attr("repeatCount","indefinite");
+
+
+linearGradient.append("stop")
+	.attr("offset","45%")
+	.attr("stop-color","#A3A3A3");
+linearGradient.append("stop")
+	.attr("offset","55%")
+	.attr("stop-color","#A3A3A3");
+linearGradient.append("stop")
+	.attr("offset","95%")
+	.attr("stop-color","#E8E8E8");
+
+////////////////////////////////////////////////////////////
+////////////////////////// Data ////////////////////////////
+////////////////////////////////////////////////////////////
+
+var Names = ["Cognitive", "Vision", "NON_skull_inj","Headache", "Depression", "Anxiety","Sleep", "Neurtology","",
+            "15 to 17","18 to 24", "25 to 34","35 to 44","45 to 64","5 to 14", "65 and over",""]
+
+var respondents = 570, //Total number of respondents (i.e. the number that make up the total group
+	emptyPerc = 0.5, //What % of the circle should become empty
+	emptyStroke = Math.round(respondents*emptyPerc); 
+	var matrix = [
+		[0,0,0,0,0,0,0,0,0,0,3,0,3,6,2,2,0],
+		[0,0,0,0,0,0,0,0,0,2,0,11,1,2,14,0,0],
+		[0,0,0,0,0,0,0,0,0,6,3,15,5,12,7,9,0],
+		[0,0,0,0,0,0,0,0,0,5,1,20,0,4,26,1,0],
+		[0,0,0,0,0,0,0,0,0,0,21,27,6,17,30,5,0,],
+		[0,0,0,0,0,0,0,0,0,0,0,127,28,0,0,0,0],
+		[0,0,0,0,0,0,0,0,0,0,1,46,11,3,14,1,0],
+		[0,0,0,0,0,0,0,0,0,0,4,48,5,5,0,6,0],
+		[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,emptyStroke],
+		[0,2,6,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+		[3,0,3,1,21,0,1,4,0,0,0,0,0,0,0,0,0,0],
+		[0,11,15,20,27,127,46,48,0,0,0,0,0,0,0,0,0],
+		[3,1,5,0,6,28,11,5,0,0,0,0,0,0,0,0,0],
+		[6,2,12,4,18,0,3,5,0,0,0,0,0,0,0,0,0],
+		[2,14,7,26,30,0,14,0,0,0,0,0,0,0,0,0,0],
+		[2,0,9,1,5,0,1,6,0,0,0,0,0,0,0,0,0],
+		[0,0,0,0,0,0,0,0,emptyStroke,0,0,0,0,0,0,0,0]
+		];
+
+	
+//Calculate how far the Chord Diagram needs to be rotated clockwise to make the dummy
+//invisible chord center vertically
+var offset = (2 * Math.PI) * (emptyStroke/(respondents + emptyStroke))/4;
+
+//Custom sort function of the chords to keep them in the original order
+var chord = customChordLayout() //d3.layout.chord()
+	.padding(.02)
+	.sortChords(d3.descending) //which chord should be shown on top when chords cross. Now the biggest chord is at the bottom
+	.matrix(matrix);
+
+var arc = d3.svg.arc()
+	.innerRadius(innerRadius)
+	.outerRadius(outerRadius)
+	.startAngle(startAngle) //startAngle and endAngle now include the offset in degrees
+	.endAngle(endAngle);
+console.log(arc)
+var path = stretchedChord() //Call the stretched chord function 
+	.radius(innerRadius)
+	.startAngle(startAngle)
+	.endAngle(endAngle)
+	.pullOutSize(pullOutSize);
+
+////////////////////////////////////////////////////////////
+//////////////////// Draw outer Arcs ///////////////////////
+////////////////////////////////////////////////////////////
+
+var g = wrapper.selectAll("g.group")
+	.data(chord.groups)
+	.enter().append("g")
+	.attr("class", "group")
+	.on("mouseover", fade(opacityLow))
+	.on("mouseout", fade(opacityDefault));
+
+g.append("path")
+	.style("stroke", function(d,i) { return (Names[i] === "" ? "none" : "#00A1DE"); })
+	.style("fill", function(d,i) { return (Names[i] === "" ? "none" : "#00A1DE"); })
+	.style("pointer-events", function(d,i) { return (Names[i] === "" ? "none" : "auto"); })
+	.attr("d", arc)
+	.attr("transform", function(d, i) { //Pull the two slices apart
+				d.pullOutSize = pullOutSize * ( d.startAngle + 0.001 > Math.PI ? -1 : 1);
+				return "translate(" + d.pullOutSize + ',' + 0 + ")";
+	});
+
+////////////////////////////////////////////////////////////
+////////////////////// Append Names ////////////////////////
+////////////////////////////////////////////////////////////
+
+//The text also needs to be displaced in the horizontal directions
+//And also rotated with the offset in the clockwise direction
+g.append("text")
+	.each(function(d) { d.angle = ((d.startAngle + d.endAngle) / 2) + offset;})
+	.attr("dy", ".35em")
+	.attr("class", "titles")
+	.style("font-size", mobileScreen ? "8px" : "10px" )
+	.attr("text-anchor", function(d) { return d.angle > Math.PI ? "end" : null; })
+	.attr("transform", function(d,i) { 
+		var c = arc.centroid(d);
+		return "translate(" + (c[0] + d.pullOutSize) + "," + c[1] + ")"
+		+ "rotate(" + (d.angle * 180 / Math.PI - 90) + ")"
+		+ "translate(" + 20 + ",0)"
+		+ (d.angle > Math.PI ? "rotate(180)" : "")
+	})
+  .text(function(d,i) { return Names[i]; })
+  .call(wrapChord, 100);
+
+////////////////////////////////////////////////////////////
+//////////////////// Draw inner chords /////////////////////
+////////////////////////////////////////////////////////////
+ 
+// ultility: url(#animatedGradient)" opacityDefault
+
+var colors = ["#4287f5", "#42f5d7", "#b3f542", "#bc42f5", "#f5ad42", "#fc03a1", "#0362fc", "#f4fc03"]
+
+wrapper.selectAll("path.chord")
+	.data(chord.chords)
+	.enter().append("path")
+	.attr("class", "chord")
+	.style("stroke", "none")
+	.style("fill", function(d){ return(colors[d.source.index]) }) //An SVG Gradient to give the impression of a flow from left to right
+	.style("opacity", function(d) { return (Names[d.source.index] === "" ? 0 : 0.55); }) //Make the dummy strokes have a zero opacity (invisible)
+	.style("pointer-events", function(d,i) { return (Names[d.source.index] === "" ? "none" : "auto"); }) //Remove pointer events from dummy strokes
+	.attr("d", path)
+	.on("mouseover", fadeOnChord)
+	.on("mouseout", fade(opacityDefault));	
+
+////////////////////////////////////////////////////////////
+////////////////// Extra Functions /////////////////////////
+////////////////////////////////////////////////////////////
+
+//Include the offset in de start and end angle to rotate the Chord diagram clockwise
+function startAngle(d) { return d.startAngle + offset; }
+function endAngle(d) { return d.endAngle + offset; }
+
+// Returns an event handler for fading a given chord group
+function fade(opacity) {
+  return function(d, i) {
+	wrapper.selectAll("path.chord")
+		.filter(function(d) { return d.source.index !== i && d.target.index !== i && Names[d.source.index] !== ""; })
+		.transition()
+		.style("opacity", opacity);
+  };
+}//fade
+
+// Fade function when hovering over chord
+function fadeOnChord(d) {
+	var chosen = d;
+	wrapper.selectAll("path.chord")
+		.transition()
+		.style("opacity", function(d) {
+			return d.source.index === chosen.source.index && d.target.index === chosen.target.index ? opacityDefault : opacityLow;
+		});
+}//fadeOnChord
+
+/*Taken from http://bl.ocks.org/mbostock/7555321
+//Wraps SVG text*/
+function wrapChord(text, width) {
+  text.each(function() {
+	var text = d3.select(this),
+		words = text.text().split(/\s+/).reverse(),
+		word,
+		line = [],
+		lineNumber = 0,
+		lineHeight = 1.1, // ems
+		y = 0,
+		x = 0,
+		dy = parseFloat(text.attr("dy")),
+		tspan = text.text(null).append("tspan").attr("x", x).attr("y", y).attr("dy", dy + "em");
+
+	while (word = words.pop()) {
+	  line.push(word);
+	  tspan.text(line.join(" "));
+	  if (tspan.node().getComputedTextLength() > width) {
+		line.pop();
+		tspan.text(line.join(" "));
+		line = [word];
+		tspan = text.append("tspan").attr("x", x).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
+	  }
+	}
+  });
+}//wrapChord
+	
+	
 	</script>
-	</body>
+	
+  </body>
 </html>
