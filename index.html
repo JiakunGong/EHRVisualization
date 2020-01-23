@@ -83,9 +83,7 @@
 		.range([0, radius])
 		.domain([0, maxValue]);
 		
-	/////////////////////////////////////////////////////////
-	//////////// Create the container SVG and g /////////////
-	/////////////////////////////////////////////////////////
+	
 
 	//Remove whatever chart with the same id/class was present before
 	d3.select(id).select("svg").remove();
@@ -99,9 +97,6 @@
 	var g = svg.append("g")
 			.attr("transform", "translate(" + (cfg.w/2 + cfg.margin.left) + "," + (cfg.h/2 + cfg.margin.top) + ")");
 	
-	/////////////////////////////////////////////////////////
-	////////// Glow filter for some extra pizzazz ///////////
-	/////////////////////////////////////////////////////////
 	
 	//Filter for the outside glow
 	var filter = g.append('defs').append('filter').attr('id','glow'),
@@ -141,9 +136,7 @@
 	   .attr("fill", "#737373")
 	   .text(function(d,i) { return Format(maxValue * d/cfg.levels); });
 
-	/////////////////////////////////////////////////////////
-	//////////////////// Draw the axes //////////////////////
-	/////////////////////////////////////////////////////////
+	
 	
 	//Create the straight lines radiating outward from the center
 	var axis = axisGrid.selectAll(".axis")
@@ -172,9 +165,7 @@
 		.text(function(d){return d})
 		.call(wrap, cfg.wrapWidth);
 
-	/////////////////////////////////////////////////////////
-	///////////// Draw the radar chart blobs ////////////////
-	/////////////////////////////////////////////////////////
+	
 	
 	//The radial line function
 	var radarLine = d3.svg.line.radial()
@@ -236,9 +227,6 @@
 		.style("fill", function(d,i,j) { return cfg.color(j); })
 		.style("fill-opacity", 0.8);
 
-	/////////////////////////////////////////////////////////
-	//////// Append invisible circles for tooltip ///////////
-	/////////////////////////////////////////////////////////
 	
 	//Wrapper for the invisible circles on top
 	var blobCircleWrapper = g.selectAll(".radarCircleWrapper")
@@ -277,9 +265,7 @@
 		.attr("class", "tooltip")
 		.style("opacity", 0);
 	
-	/////////////////////////////////////////////////////////
-	/////////////////// Helper Function /////////////////////
-	/////////////////////////////////////////////////////////
+	
 
 	//Taken from http://bl.ocks.org/mbostock/7555321
 	//Wraps SVG text	
